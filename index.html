@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Алгоритм выбора метода биостатистического анализа</title>
+<style>
+:root {
+  --ink:#183247; --muted:#617486; --line:#dce5ec; --bg:#f4f7fa;
+  --blue:#dcecf8; --blue-ink:#24577c; --green:#e2f2e9; --green-ink:#24664d;
+  --orange:#fff0e3; --orange-ink:#985020; --purple:#eee8fa; --purple-ink:#62449a;
+  --white:#fff; --shadow:0 10px 30px rgba(25,52,75,.08);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+header{padding:38px 20px 28px;background:linear-gradient(120deg,#e8f2fb,#f4f7fa 55%,#e9f4ee);border-bottom:1px solid var(--line)}
+.wrap{max-width:1100px;margin:0 auto}
+.eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:.76rem;font-weight:750;color:var(--blue-ink)}
+h1{font-size:clamp(1.8rem,4vw,2.8rem);line-height:1.12;margin:.55rem 0 .8rem;max-width:850px}
+header p{max-width:780px;color:var(--muted);margin:0;font-size:1.05rem}
+main{padding:28px 20px 60px}
+.layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:22px;align-items:start}
+.panel{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:var(--shadow)}
+h2{font-size:1.25rem;margin:0 0 6px}
+.intro{color:var(--muted);margin:0 0 22px;font-size:.93rem}
+.field{padding:17px 0;border-top:1px solid #edf1f5}
+.field:first-of-type{border-top:0}
+label.q{display:block;font-weight:700;margin-bottom:10px}
+select,input[type="text"]{width:100%;padding:11px 12px;border:1px solid #cbd7e1;border-radius:10px;background:#fff;color:var(--ink);font:inherit}
+select:focus,input:focus{outline:3px solid #c8e2f5;border-color:#6799bd}
+.hint{font-size:.84rem;color:var(--muted);margin:7px 0 0}
+.checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.check{display:flex;gap:9px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:.9rem;cursor:pointer}
+.check input{margin-top:4px;accent-color:#2d6b92}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:12px 16px;cursor:pointer}
+.primary{background:#245b80;color:#fff}
+.secondary{background:#edf2f6;color:var(--ink)}
+button:hover{filter:brightness(.97)}
+.result{position:sticky;top:18px}
+.result-top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.status{display:inline-block;border-radius:999px;padding:5px 10px;font-size:.75rem;font-weight:750;background:var(--green);color:var(--green-ink)}
+.empty{padding:22px 16px;border-radius:13px;background:#f6f8fa;color:var(--muted);text-align:center}
+.result h3{font-size:1.1rem;margin:18px 0 8px}
+.result h3:first-of-type{margin-top:12px}
+.result ul{padding-left:20px;margin:8px 0}
+.result li{margin:5px 0}
+.method{padding:15px;border-radius:12px;background:var(--blue);color:var(--blue-ink);font-weight:750;font-size:1.05rem}
+.caution{padding:13px 14px;border-radius:12px;background:var(--orange);color:var(--orange-ink);font-size:.9rem;margin-top:14px}
+.small{font-size:.88rem;color:var(--muted)}
+details{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+summary{cursor:pointer;font-weight:700}
+footer{max-width:1100px;margin:0 auto;padding:0 20px 28px;color:var(--muted);font-size:.84rem}
+@media(max-width:820px){.layout{grid-template-columns:1fr}.result{position:static}.panel{padding:19px}}
+@media(max-width:480px){.checks{grid-template-columns:1fr}header{padding-top:28px}}
+@media print{body{background:#fff}.panel{box-shadow:none}.result{position:static}button{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Интерактивный помощник исследователя</div>
+    <h1>Как выбрать метод биостатистического анализа</h1>
+    <p>Ответьте на вопросы о цели исследования, типе исхода и структуре данных. Алгоритм предложит стартовый метод, подскажет, что проверить, и какие показатели представить в публикации.</p>
+  </div>
+</header>
+<main class="wrap">
+<div class="layout">
+<section class="panel">
+  <h2>Параметры исследования</h2>
+  <p class="intro">Заполните поля. Если характеристика пока неизвестна, выберите «Не уверен(а)» — алгоритм отметит, что нужно уточнить.</p>
+  <form id="wizard">
+    <div class="field">
+      <label class="q" for="goal">1. Какова основная цель?</label>
+      <select id="goal">
+        <option value="">Выберите цель…</option>
+        <option value="describe">Описать выборку</option>
+        <option value="compare">Сравнить группы или условия</option>
+        <option value="association">Оценить связь / независимый эффект</option>
+        <option value="predict">Предсказать исход</option>
+        <option value="survival">Изучить время до события</option>
+        <option value="cluster">Найти подгруппы или структуру признаков</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="q" for="outcome">2. Какой тип основного исхода?</label>
+      <select id="outcome">
+        <option value="">Выберите тип…</option>
+        <option value="continuous">Количественный (например, возраст, уровень биомаркера)</option>
+        <option value="binary">Бинарный (да/нет, есть/нет)</option>
+        <option value="categorical">Категориальный номинальный (тип заболевания)</option>
+        <option value="ordinal">Порядковый (степень тяжести)</option>
+        <option value="count">Счетный (число событий)</option>
+        <option value="time">Время до события с возможным цензурированием</option>
+        <option value="unknown">Не уверен(а)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="q" for="groups">3. Сколько групп / условий сравнивается?</label>
+      <select id="groups">
+        <option value="">Выберите…</option>
+        <option value="1">Одна выборка — описание или связь</option>
+        <option value="2">Две группы / два условия</option>
+        <option value="3plus">Три и более групп / условий</option>
+        <option value="na">Не применимо / пока неизвестно</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="q" for="dependence">4. Как связаны наблюдения?</label>
+      <select id="dependence">
+        <option value="">Выберите…</option>
+        <option value="independent">Независимые участники / группы</option>
+        <option value="paired">Парные измерения (до–после, пары)</option>
+        <option value="repeated">Повторные измерения у одного участника</option>
+        <option value="clustered">Семьи, центры или другие кластеры</option>
+        <option value="unknown">Не уверен(а)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="q" for="distribution">5. Что известно о распределении количественных данных?</label>
+      <select id="distribution">
+        <option value="unknown">Пока не проверено</option>
+        <option value="parametric">Предпосылки параметрического анализа приемлемы</option>
+        <option value="skewed">Асимметрия / выбросы / сомнения в предпосылках</option>
+        <option value="notcontinuous">Исход не количественный</option>
+      </select>
+      <p class="hint">Оценивайте графики и предпосылки конкретной модели, а не только p-value теста нормальности.</p>
+    </div>
+    <div class="field">
+      <label class="q" for="adjust">6. Нужна ли поправка на дополнительные факторы?</label>
+      <select id="adjust">
+        <option value="yes">Да — возраст, пол, сопутствующие факторы и т. п.</option>
+        <option value="no">Нет, нужен первичный нескорректированный анализ</option>
+        <option value="unknown">Пока не определено</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="q">7. Какие особенности данных нужно учесть? (отметьте все подходящие)</label>
+      <div class="checks">
+        <label class="check"><input type="checkbox" name="issue" value="small"> Маленькая выборка / редкие события</label>
+        <label class="check"><input type="checkbox" name="issue" value="missing"> Есть пропущенные значения</label>
+        <label class="check"><input type="checkbox" name="issue" value="multiple"> Много гипотез / сравнений</label>
+        <label class="check"><input type="checkbox" name="issue" value="genetic"> Генетические или семейные данные</label>
+        <label class="check"><input type="checkbox" name="issue" value="prediction"> Нужна внешняя проверка прогноза</label>
+        <label class="check"><input type="checkbox" name="issue" value="none"> Существенные особенности пока не выявлены</label>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="primary" type="submit">Подобрать метод</button>
+      <button class="secondary" type="reset" id="reset">Очистить</button>
+    </div>
+  </form>
+</section>
+
+<aside class="panel result" aria-live="polite" id="result">
+  <div class="result-top"><h2>Результат</h2><span class="status">Алгоритм</span></div>
+  <div class="empty">Заполните параметры слева и нажмите «Подобрать метод». Здесь появятся рекомендуемый подход, проверки и формат представления результата.</div>
+</aside>
+</div>
+</main>
+<footer>
+  Это справочный алгоритм, а не замена статистическому плану или консультации биостатистика. Итоговый выбор зависит от дизайна, гипотезы, размера выборки, предпосылок модели и предметной области.
+</footer>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function selectedIssues(){return [...document.querySelectorAll('input[name="issue"]:checked')].map(x=>x.value)}
+function buildRecommendation(d){
+  const {goal,outcome,groups,dependence,distribution,adjust,issues}=d;
+  let method="",why=[],checks=[],report=[],caution=[];
+  const dependent = ["paired","repeated"].includes(dependence);
+  const clustered = ["clustered","genetic"].includes(dependence) || issues.includes("genetic");
+  if(!goal || !outcome || !groups || !dependence){
+    return {method:"Уточните ключевые параметры",why:["Для обоснованного выбора нужны цель, тип исхода, число групп и структура наблюдений."],checks:["Если возможно, заранее определите первичную конечную точку и основной оцениваемый эффект."],report:["После уточнения укажите размер эффекта и 95% доверительный интервал."],caution:["Не выбирайте тест только по нормальности распределения или по тому, какой метод дает меньшее p-value."]};
+  }
+  if(goal==="describe"){
+    method = outcome==="continuous" ? "Описательная статистика: среднее ± SD и/или медиана [Q1; Q3]" :
+      outcome==="time" ? "Описать время наблюдения, события, цензурирование; при необходимости — Каплан–Майер" :
+      "Абсолютные частоты и доли n (%)";
+    why=["Цель — описать наблюдаемую выборку, а не делать выводы о причинности или популяции."];
+    checks=["Проверить единицы измерения, диапазоны, дубликаты и пропуски.","Для количественных данных изучить гистограммы и Q–Q-графики."];
+    report=outcome==="continuous"?["Число наблюдений (n), среднее и SD при симметричном распределении; медиана и IQR при асимметрии.","При необходимости — минимум и максимум."]:["n и %, с указанием знаменателя для каждой доли.","Указывать количество пропущенных наблюдений."];
+  } else if(goal==="predict" || issues.includes("prediction")){
+    method = outcome==="time" || outcome==="time" ? "Прогностическая модель времени до события (например, Cox; при необходимости — альтернативная survival-модель)" :
+      outcome==="binary" ? "Логистическая регрессия или подходящий алгоритм классификации" :
+      outcome==="continuous" ? "Линейная регрессия или регрессионный алгоритм" :
+      "Модель, соответствующая типу целевого исхода";
+    why=["Для прогноза важны качество предсказаний на новых данных, а не только статистическая значимость предикторов."];
+    checks=["Исключить утечку данных и определить момент, в который прогноз должен быть доступен.","Использовать разделение данных или кросс-валидацию; настройку гиперпараметров выполнять внутри обучающего контура.","По возможности выполнить внешнюю валидацию."];
+    report=["Для классификации: дискриминация, калибровка и метрики, подходящие клинической задаче.","Для количественного прогноза: MAE/RMSE и проверка калибровки.","Для survival-модели — метрики, учитывающие цензурирование."];
+    caution.push("Маленькая выборка может привести к нестабильной оценке прогностической эффективности.");
+  } else if(goal==="survival" || outcome==="time"){
+    method = "Анализ выживаемости: Каплан–Майер и log-rank для описательного сравнения; регрессия Кокса для скорректированных ассоциаций";
+    why=["Исход включает время до события и возможное цензурирование."];
+    checks=["Проверить корректность даты начала наблюдения, события и цензурирования.","Для модели Кокса проверить пропорциональность рисков и форму связи непрерывных предикторов."];
+    report=["Число событий и цензурированных наблюдений.","Кривые выживаемости; HR и 95% ДИ для модели Кокса."];
+  } else if(goal==="cluster"){
+    method = outcome==="categorical" || outcome==="ordinal" || outcome==="binary" ? "Для категориальных признаков: MCA и/или латентный классовый анализ; кластеризация — после выбора подходящей меры расстояния" : "Для количественных признаков: PCA для сокращения размерности и/или кластерный анализ";
+    why=["Цель — исследовать структуру признаков или возможные подгруппы, а не проверить один заранее заданный эффект."];
+    checks=["Стандартизовать количественные переменные, если шкалы различаются.","Оценить устойчивость кластеров и обосновать число групп.","По возможности проверить результат на независимой выборке."];
+    report=["Метод обработки признаков и критерий выбора числа кластеров/классов.","Показатели устойчивости и ограничения интерпретации."];
+    caution.push("Обнаруженные кластеры не являются автоматически доказанными клиническими подтипами.");
+  } else if(goal==="compare"){
+    if(outcome==="continuous"){
+      if(dependent){
+        method = groups==="2" ? (distribution==="parametric" ? "Парный t-тест для разностей" : "Критерий Уилкоксона для связанных выборок или парная перестановочная процедура") :
+          (distribution==="parametric" ? "ANOVA повторных измерений или линейная смешанная модель" : "Критерий Фридмана либо подходящая смешанная модель");
+      } else {
+        method = groups==="2" ? (distribution==="parametric" ? "t-тест Уэлча для двух независимых групп" : "Критерий Манна–Уитни; интерпретация как сдвига медиан требует дополнительных условий") :
+          (distribution==="parametric" ? "Однофакторный ANOVA; при неодинаковых дисперсиях — ANOVA Уэлча" : "Критерий Краскела–Уоллиса; для парных сравнений — подходящая post-hoc процедура");
+      }
+      why.push("Выбор основан на количественном исходе, числе условий и зависимости наблюдений.");
+      checks.push("Проверить распределение и выбросы; для параметрических моделей оценить остатки и дисперсии.","При повторных измерениях учитывать корреляцию внутри участника.");
+      report.push("Разность средних или другой соответствующий размер эффекта с 95% ДИ.","Для нескольких групп описать post-hoc сравнения и коррекцию множественности.");
+    } else if(["binary","categorical","ordinal"].includes(outcome)){
+      method = dependent ? "Для парного бинарного исхода — критерий Мак-Немара; для сложных повторных/порядковых данных — соответствующая смешанная модель" :
+        "Для категориальных данных — χ² Пирсона при достаточных ожидаемых частотах; точный критерий Фишера для разреженной таблицы 2×2";
+      why.push("Сравниваются частоты/доли категорий или распределение категориального исхода.");
+      checks.push("Проверить ожидаемые частоты в ячейках таблицы.","Для порядкового исхода рассмотреть порядковую модель, если важно использовать порядок категорий.");
+      report.push("n (%) в каждой группе, оценка различия или OR/RR с 95% ДИ при уместности.");
+    } else {
+      method="Сначала уточнить тип исхода и сформулировать сравниваемый эффект";
+      checks.push("Необходимо определить, является ли исход бинарным, порядковым, количественным или временем до события.");
+    }
+  } else {
+    if(outcome==="continuous"){
+      method = adjust==="yes" ? (dependent ? "Линейная смешанная модель с поправкой на ковариаты" : "Множественная линейная регрессия / ANCOVA") : "Корреляция Пирсона (линейная связь) или Спирмена (монотонная связь); при необходимости — регрессия";
+      why.push("Для количественного исхода регрессия позволяет оценить связь и, при необходимости, скорректировать ее на ковариаты.");
+      checks.push("Проверить линейность, остатки, гетероскедастичность, мультиколлинеарность и влиятельные наблюдения.");
+      report.push("Коэффициент β или коэффициент корреляции с 95% ДИ.");
+    } else if(outcome==="binary"){
+      method = adjust==="yes" ? "Логистическая регрессия; при редких событиях или разделении — рассмотреть точный метод или регрессию Фирта" : "Таблица сопряженности и OR; при необходимости — логистическая регрессия";
+      why.push("Бинарный исход обычно анализируют методами для долей или логистической регрессией.");
+      checks.push("Оценить число событий относительно числа параметров и возможное полное разделение.","Проверить кодировку исхода и линейность непрерывных предикторов по логиту.");
+      report.push("OR и 95% ДИ; при распространенном исходе помнить, что OR не равен RR.");
+    } else if(outcome==="count"){
+      method="Poisson-регрессия; при сверхдисперсии — отрицательно-биномиальная модель";
+      checks.push("Проверить сверхдисперсию и необходимость учета времени/экспозиции.");
+      report.push("Отношение интенсивностей событий и 95% ДИ.");
+    } else if(outcome==="ordinal"){
+      method="Порядковая логистическая регрессия при выполнении предположения пропорциональности шансов";
+      checks.push("Проверить предположение пропорциональности шансов и достаточность данных по категориям.");
+      report.push("Оценку эффекта с 95% ДИ и распределение исхода по категориям.");
+    } else if(outcome==="categorical"){
+      method="Мультиномиальная логистическая регрессия для номинального исхода с более чем двумя категориями";
+      checks.push("Проверить число наблюдений в каждой категории и выбрать обоснованную референсную категорию.");
+      report.push("Относительные OR и 95% ДИ для категорий относительно референсной.");
+    } else {
+      method="Уточнить тип исхода; затем выбрать регрессионную модель, соответствующую его шкале";
+    }
+    why.push(adjust==="yes" ? "Планируется оценить связь с учетом дополнительных факторов." : "Для оценки независимого эффекта может потребоваться корректировка на обоснованные конфаундеры.");
+  }
+  if(clustered){
+    checks.push("Учитывать родство или кластеризацию: рассмотреть смешанные модели, GEE, кластерно-робастные ошибки или специализированные семейные методы.");
+    caution.push("Обычные тесты независимых наблюдений могут давать неверные стандартные ошибки при наличии семейной или кластерной зависимости.");
+  }
+  if(issues.includes("small")){
+    checks.push("При малой выборке/редких событиях оценить устойчивость метода; рассмотреть точные методы, регуляризацию или бутстрэп, если это подходит дизайну.");
+    caution.push("Широкий доверительный интервал может отражать недостаточную точность даже при отсутствии статистической значимости.");
+  }
+  if(issues.includes("missing")){
+    checks.push("Описать долю и причины пропусков; обосновать анализ полных наблюдений или множественную импутацию и провести анализ чувствительности.");
+  }
+  if(issues.includes("multiple")){
+    checks.push("Заранее определить семейство гипотез и метод коррекции: Holm/Bonferroni для семейной ошибки или Benjamini–Hochberg для FDR в поисковом анализе.");
+  }
+  if(issues.includes("genetic")){
+    checks.push("Для генетических ассоциаций оценить популяционную стратификацию, родство, модель наследования и множественность вариантов/фенотипов.");
+  }
+  checks.push("Заранее определить первичную конечную точку и не выбирать модель только по полученному p-value.");
+  if(!report.length) report.push("Размер эффекта, 95% доверительный интервал, p-value и число анализируемых наблюдений.");
+  report.push("Описать пропуски, исключения и все корректировки, фактически выполненные в анализе.");
+  if(!caution.length) caution.push("Рекомендация предварительная: финальный выбор зависит от дизайна, предпосылок и научного вопроса.");
+  return {method,why,checks,report,caution};
+}
+function renderList(items){return '<ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'}
+$('wizard').addEventListener('submit',e=>{
+  e.preventDefault();
+  const d={goal:$('goal').value,outcome:$('outcome').value,groups:$('groups').value,dependence:$('dependence').value,distribution:$('distribution').value,adjust:$('adjust').value,issues:selectedIssues()};
+  const r=buildRecommendation(d);
+  $('result').innerHTML='<div class="result-top"><h2>Результат</h2><span class="status">Предварительная рекомендация</span></div>'+
+    '<div class="method">'+esc(r.method)+'</div>'+
+    '<h3>Почему этот подход?</h3>'+renderList(r.why)+
+    '<h3>Что проверить перед анализом</h3>'+renderList(r.checks)+
+    '<h3>Что представить в результатах</h3>'+renderList(r.report)+
+    '<div class="caution"><strong>Ограничения и предостережения</strong>'+renderList(r.caution)+'</div>'+
+    '<details><summary>Общие правила интерпретации</summary><ul><li>p-value не показывает величину эффекта и не является вероятностью истинности гипотезы.</li><li>Статистическая значимость не равна клинической значимости.</li><li>При множественных проверках учитывайте инфляцию ложноположительных результатов.</li><li>Для наблюдательных исследований ассоциация сама по себе не доказывает причинность.</li></ul></details>'+
+    '<div class="actions"><button type="button" class="secondary" onclick="window.print()">Распечатать / сохранить PDF</button></div>';
+  $('result').scrollIntoView({behavior:'smooth',block:'start'});
+});
+$('wizard').addEventListener('reset',()=>{setTimeout(()=>{$('result').innerHTML='<div class="result-top"><h2>Результат</h2><span class="status">Алгоритм</span></div><div class="empty">Заполните параметры слева и нажмите «Подобрать метод». Здесь появятся рекомендуемый подход, проверки и формат представления результата.</div>'},0)});
+</script>
+</body>
+</html>
